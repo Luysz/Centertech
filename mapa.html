@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>CenterTech</title>
+
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+        }
+
+        header {
+    background: #111827;
+    color: white;
+    padding: 12px 18px;
+    text-align: center;
+    position: relative;
+    z-index: 1000;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 26px;
+}
+
+header p {
+    margin: 3px 0 0;
+    opacity: 0.8;
+    font-size: 14px;
+}
+
+        #map {
+            height: calc(100vh - 90px);
+            width: 100%;
+        }
+
+        .info {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .livre {
+            color: green;
+            font-weight: bold;
+        }
+
+        .ocupada {
+            color: red;
+            font-weight: bold;
+        }
+        .painel {
+    margin-top: 8px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 14px;
+}
+
+.painel span {
+    background: rgba(255, 255, 255, 0.08);
+    padding: 5px 10px;
+    border-radius: 20px;
+}
+
+.painel strong {
+    font-size: 16px;
+}
+
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>🚗 CenterTech</h1>
+    <p>Sistema inteligente de estacionamento urbano</p>
+
+    <div class="painel">
+    <span>🟢 Livres: <strong id="livres">0</strong></span>
+
+    <span>🔴 Ocupadas: <strong id="ocupadas">0</strong></span>
+
+    <span>🅿️ Total: <strong id="total">0</strong></span>
+
+    <span>📊 Ocupação: <strong id="ocupacao">0%</strong></span>
+</div>
+</header>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+
+    // Centro inicial do mapa
+    const mapa = L.map('map').setView(
+    [-23.0880, -47.2164],
+    18
+);
+
+// Botão de localização
+const botaoLocalizacao = L.control({ position: 'topright' });
+
+botaoLocalizacao.onAdd = function() {
+    const div = L.DomUtil.create('div');
+
+    div.innerHTML = `
+        <button id="btnLocalizacao" style="
+            background:white;
+            border:none;
+            border-radius:8px;
+            padding:10px 12px;
+            font-size:20px;
+            cursor:pointer;
+            box-shadow:0 2px 8px rgba(0,0,0,0.3);
+        ">
+            📍
+        </button>
+    `;
+
+    return div;
+};
+
+botaoLocalizacao.addTo(mapa);
+
+document.getElementById('btnLocalizacao').onclick = function() {
+
+    mapa.locate({
+        setView: true,
+        maxZoom: 18
+    });
+
+};
+
+// Barra de pesquisa de endereço
+const busca = L.control({ position: 'topleft' });
+
+busca.onAdd = function() {
+
+    const div = L.DomUtil.create('div');
+
+    div.innerHTML = `
+        <div style="
+            background:white;
+            padding:8px;
+            border-radius:8px;
+            box-shadow:0 2px 8px rgba(0,0,0,0.3);
+            display:flex;
+            gap:5px;
+        ">
+            <input
+                id="campoBusca"
+                type="text"
+                placeholder="🔎 Pesquisar endereço"
+                style="
+                    width:220px;
+                    padding:8px;
+                    border:1px solid #ccc;
+                    border-radius:5px;
+                    outline:none;
+                "
+            >
+
+            <button
+                id="btnBuscar"
+                style="
+                    padding:8px 12px;
+                    border:none;
+                    border-radius:5px;
+                    background:#111827;
+                    color:white;
+                    cursor:pointer;
+                "
+            >
+                Buscar
+            </button>
+        </div>
+    `;
+
+    L.DomEvent.disableClickPropagation(div);
+
+    return div;
+};
+
+busca.addTo(mapa);
+
+document.getElementById('btnBuscar').onclick = async function() {
+
+    const endereco = document.getElementById('campoBusca').value;
+
+    if (!endereco) {
+        alert('Digite um endereço.');
+        return;
+    }
+
+    try {
+
+        const resposta = await fetch(
+            'https://nominatim.openstreetmap.org/search?format=json&limit=1&q='
+            + encodeURIComponent(endereco)
+        );
+
+        const resultados = await resposta.json();
+
+        if (resultados.length === 0) {
+            alert('Endereço não encontrado.');
+            return;
+        }
+
+        const latitude = parseFloat(resultados[0].lat);
+        const longitude = parseFloat(resultados[0].lon);
+
+        mapa.setView(
+            [latitude, longitude],
+            18
+        );
+
+        L.marker([latitude, longitude])
+            .addTo(mapa)
+            .bindPopup(endereco)
+            .openPopup();
+
+    } catch (erro) {
+
+        console.error('Erro na busca:', erro);
+
+        alert('Não foi possível pesquisar o endereço.');
+
+    }
+};
+
+    // Mapa OpenStreetMap
+    L.tileLayer(
+        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        {
+            attribution: '&copy; OpenStreetMap contributors'
+        }
+    ).addTo(mapa);
+
+
+    // Guarda os marcadores das vagas
+    const marcadores = {};
+
+
+    // Cria o marcador de uma vaga
+    function criarMarcador(vaga) {
+
+        let cor;
+
+        if (vaga.status === "livre") {
+            cor = "green";
+        } else {
+            cor = "red";
+        }
+
+
+
+const icone = L.divIcon({
+    className: '',
+    html: `
+        <div style="
+            width: 42px;
+            height: 42px;
+            background: ${cor};
+            border: 3px solid white;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        ">
+            <span style="
+                color: white;
+                font-weight: bold;
+                font-size: 11px;
+                transform: rotate(45deg);
+            ">
+                ${vaga.codigo}
+            </span>
+        </div>
+    `,
+    iconSize: [48, 48],
+    iconAnchor: [24, 48]
+});
+
+        return L.marker(
+            [vaga.latitude, vaga.longitude],
+            { icon: icone }
+        );
+    }
+
+
+    // Busca as vagas na API
+    async function atualizarVagas() {
+
+        try {
+
+            const resposta = await fetch('/vagas');
+
+            const vagas = await resposta.json();
+
+	    let livres = 0;
+let ocupadas = 0;
+
+vagas.forEach(vaga => {
+    if (vaga.status === "livre") {
+        livres++;
+    } else {
+        ocupadas++;
+    }
+});
+
+let total = vagas.length;
+let percentual = 0;
+
+if (total > 0) {
+    percentual = Math.round((ocupadas / total) * 100);
+}
+
+document.getElementById("livres").textContent = livres;
+document.getElementById("ocupadas").textContent = ocupadas;
+document.getElementById("total").textContent = total;
+document.getElementById("ocupacao").textContent = percentual + "%";
+
+vagas.forEach(vaga => {
+
+    const marcadorExistente = marcadores[vaga.codigo];
+
+    // Se o marcador já existe e o status não mudou,
+    // não recria o marcador
+    if (
+        marcadorExistente &&
+        marcadorExistente._status === vaga.status
+    ) {
+        return;
+    }
+
+    // Se o marcador existe e o status mudou, remove o antigo
+    if (marcadorExistente) {
+        mapa.removeLayer(marcadorExistente);
+    }
+
+    const marcador = criarMarcador(vaga);
+
+    marcador._status = vaga.status;
+
+    marcador.bindPopup(`
+    <div class="info" style="
+    min-width:170px;
+    max-width:190px;
+    font-size:13px;
+    ">
+
+        <h3 style="
+    margin:0 0 8px 0;
+    font-size:16px;
+">
+    🚗 ${vaga.codigo}
+</h3>
+
+        <p style="margin:4px 0;">
+    <strong>Status:</strong>
+    <span class="${vaga.status}">
+        ${vaga.status.toUpperCase()}
+    </span>
+</p>
+
+<p style="margin:4px 0;">
+    <strong>ID da vaga:</strong> ${vaga.id}
+</p>
+
+<p style="margin:4px 0;">
+    <strong>Local:</strong><br>
+    Praça Prudente de Moraes
+</p>
+
+        <hr style="margin:8px 0;">
+
+        <h4 style="
+    margin:8px 0 6px 0;
+    font-size:14px;
+">
+    📋 Histórico recente
+</h4>
+
+        <div id="historico-${vaga.codigo}">
+            Carregando histórico...
+        </div>
+
+                    </div>
+    `, {
+        closeButton: true,
+        autoClose: true,
+        closeOnClick: true,
+        maxWidth: 220,
+        minWidth: 180
+    });
+
+
+marcador.on('popupopen', async function() {
+
+    const container =
+        document.getElementById(`historico-${vaga.codigo}`);
+
+    if (!container) {
+        return;
+    }
+
+    try {
+
+        const resposta =
+            await fetch('/historico');
+
+        const historico =
+            await resposta.json();
+
+        const registrosVaga =
+            historico.filter(
+                registro => registro.vaga === vaga.codigo
+            );
+
+        if (registrosVaga.length === 0) {
+
+            container.innerHTML =
+                '<p>Nenhum histórico encontrado.</p>';
+
+            return;
+        }
+
+        container.innerHTML = '';
+
+        registrosVaga.slice(0, 3).forEach(registro => {
+
+            const data =
+                new Date(registro.data_hora);
+
+            const dataFormatada =
+                data.toLocaleString('pt-BR');
+
+            const statusTexto =
+                registro.status === 'livre'
+                    ? '🟢 Livre'
+                    : '🔴 Ocupada';
+
+            const linha =
+                document.createElement('div');
+
+            linha.style.marginBottom = '4px';
+linha.style.fontSize = '12px';
+
+            linha.innerHTML = `
+                <div>
+                    <strong>${statusTexto}</strong>
+                </div>
+
+                <div style="
+                    color:#666;
+                    font-size:12px;
+                ">
+                    ${dataFormatada}
+                </div>
+            `;
+
+            container.appendChild(linha);
+
+        });
+
+    } catch (erro) {
+
+        console.error(
+            'Erro ao carregar histórico:',
+            erro
+        );
+
+        container.innerHTML =
+            '<p>Erro ao carregar histórico.</p>';
+    }
+
+});
+
+    marcador.addTo(mapa);
+
+    marcadores[vaga.codigo] = marcador;
+
+});
+
+        } catch (erro) {
+
+            console.error(
+                "Erro ao buscar vagas:",
+                erro
+            );
+
+        }
+    }
+
+
+    // Primeira atualização
+    atualizarVagas();
+
+    // Atualiza a cada 5 segundos
+    setInterval(atualizarVagas, 5000);
+
+</script>
+
+</body>
+</html>
