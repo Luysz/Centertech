@@ -83,7 +83,8 @@ header p {
             position: absolute;
             z-index: 1200;
             top: 175px;
-            right: 12px;
+            left: 12px;
+            right: auto;
             width: min(340px, calc(100vw - 48px));
             max-height: 55vh;
             overflow-y: auto;
@@ -95,7 +96,16 @@ header p {
             color: #111827;
             font-size: 13px;
         }
-        #painelProximas h3 { margin: 0 0 8px; font-size: 16px; }
+        #painelProximas h3 { margin: 0 32px 8px 0; font-size: 16px; }
+        #fecharProximas {
+            position: absolute; top: 6px; right: 6px;
+            width: 28px; height: 28px; padding: 0 !important;
+            font-size: 20px; line-height: 28px;
+            background: #e5e7eb !important; color: #111827 !important;
+        }
+        #controlesLocalizacao { display: flex; flex-direction: column; gap: 6px; }
+        #btnLocalizacao, #btnProximas { width: 100%; box-sizing: border-box; }
+        #btnProximas { margin-top: 0 !important; }
         #painelProximas .vaga-proxima {
             padding: 8px 0;
             border-top: 1px solid #e5e7eb;
@@ -108,60 +118,8 @@ header p {
             margin-top: 6px; display: block; width: 100%;
             font-size: 13px; font-weight: bold;
         }
-        #controleBusca {
-            position: relative;
-            display: flex;
-            gap: 5px;
-            align-items: center;
-            box-sizing: border-box;
-            width: min(300px, calc(100vw - 60px));
-            max-width: calc(100vw - 60px);
-            padding: 6px;
-            background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,.3);
-        }
-        #campoBusca {
-            flex: 1 1 auto;
-            min-width: 0;
-            width: 0;
-            box-sizing: border-box;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            outline: none;
-        }
-        #btnBuscar { flex: 0 0 auto; padding: 8px 10px; }
-        #sugestoesBusca {
-            position: absolute;
-            top: calc(100% + 4px);
-            left: 0;
-            right: 0;
-            display: none;
-            max-height: 220px;
-            overflow-y: auto;
-            background: white;
-            border-radius: 7px;
-            box-shadow: 0 3px 12px rgba(0,0,0,.28);
-            z-index: 2000;
-            color: #111827;
-        }
-        .sugestao-endereco {
-            display: block;
-            width: 100%;
-            border: 0;
-            border-bottom: 1px solid #e5e7eb;
-            background: white;
-            padding: 9px 10px;
-            text-align: left;
-            font-size: 12px;
-            line-height: 1.35;
-            cursor: pointer;
-        }
-        .sugestao-endereco:hover, .sugestao-endereco:focus { background: #f3f4f6; }
         @media (max-width: 600px) {
-            #painelProximas { top: 165px; right: 8px; }
-            #controleBusca { width: min(280px, calc(100vw - 58px)); }
+            #painelProximas { top: 165px; left: 8px; right: auto; }
         }
 
     </style>
@@ -186,10 +144,10 @@ header p {
 
 <div id="map"></div>
 <div id="painelProximas" role="region" aria-label="Vagas próximas">
+    <button type="button" id="fecharProximas" aria-label="Fechar painel">×</button>
     <h3>📍 Vagas próximas de mim</h3>
     <p id="estadoProximas">Toque em “Encontrar vagas próximas” para usar sua localização.</p>
     <div id="listaProximas"></div>
-    <button type="button" id="fecharProximas">Fechar</button>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -203,10 +161,11 @@ header p {
 );
 
 // Botão de localização
-const botaoLocalizacao = L.control({ position: 'topright' });
+const botaoLocalizacao = L.control({ position: 'topleft' });
 
 botaoLocalizacao.onAdd = function() {
     const div = L.DomUtil.create('div');
+    div.id = "controlesLocalizacao";
 
     div.innerHTML = `
         <button id="btnLocalizacao" style="
@@ -242,6 +201,7 @@ let marcadorUsuario = null;
 let circuloPrecisao = null;
 let ultimaLocalizacaoUsuario = null;
 let vagasCache = [];
+let camadaRota = null;
 
 function distanciaMetros(lat1, lon1, lat2, lon2) {
     const R = 6371000;
@@ -295,12 +255,60 @@ function exibirVagasProximas() {
         linha.innerHTML = `
             <div><strong>${vaga.codigo}</strong> — ${status}</div>
             <div>Distância em linha reta: ${formatarDistancia(vaga.distancia)}</div>
-            <button type="button">Ver no mapa</button>
+            <button type="button">Traçar rota</button>
         `;
-        linha.querySelector('button').onclick = () => {
-            mapa.setView([vaga.latitude, vaga.longitude], 19);
-            const marcador = marcadores[vaga.codigo];
-            if (marcador) marcador.openPopup();
+        linha.querySelector('button').textContent = 'Traçar rota no mapa';
+        linha.querySelector('button').onclick = async () => {
+            if (!ultimaLocalizacaoUsuario) {
+                localizarUsuario(true);
+                return;
+            }
+
+            const botaoRota = linha.querySelector('button');
+            botaoRota.disabled = true;
+            botaoRota.textContent = 'Calculando rota…';
+            estado.textContent = `Calculando o trajeto até ${vaga.codigo}…`;
+
+            try {
+                // OSRM recebe coordenadas na ordem longitude,latitude.
+                const origem = `${ultimaLocalizacaoUsuario.lng},${ultimaLocalizacaoUsuario.lat}`;
+                const destino = `${vaga.longitude},${vaga.latitude}`;
+                const url = `https://router.project-osrm.org/route/v1/driving/${origem};${destino}?overview=full&geometries=geojson&steps=true`;
+                const resposta = await fetch(url);
+
+                if (!resposta.ok) throw new Error('O serviço de rotas não respondeu.');
+                const dados = await resposta.json();
+
+                if (dados.code !== 'Ok' || !dados.routes || !dados.routes.length) {
+                    throw new Error('Não foi possível encontrar uma rota viária para esta vaga.');
+                }
+
+                if (camadaRota) mapa.removeLayer(camadaRota);
+
+                const rota = dados.routes[0];
+                const coordenadas = rota.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+                camadaRota = L.polyline(coordenadas, {
+                    color: '#2563eb',
+                    weight: 6,
+                    opacity: 0.9,
+                    lineJoin: 'round'
+                }).addTo(mapa);
+
+                mapa.fitBounds(camadaRota.getBounds(), {padding: [45, 45]});
+                L.popup()
+                    .setLatLng([vaga.latitude, vaga.longitude])
+                    .setContent(`<strong>${vaga.codigo}</strong><br>Trajeto: ${formatarDistancia(rota.distance)}<br>Tempo estimado: ${Math.max(1, Math.round(rota.duration / 60))} min`)
+                    .openOn(mapa);
+
+                estado.textContent = `Rota até ${vaga.codigo}: ${formatarDistancia(rota.distance)} · aproximadamente ${Math.max(1, Math.round(rota.duration / 60))} min.`;
+                botaoRota.textContent = 'Atualizar rota';
+            } catch (erro) {
+                console.error('Erro ao calcular rota:', erro);
+                estado.textContent = erro.message || 'Não foi possível calcular a rota. Tente novamente.';
+                botaoRota.textContent = 'Tentar novamente';
+            } finally {
+                botaoRota.disabled = false;
+            }
         };
         lista.appendChild(linha);
     });
@@ -325,14 +333,10 @@ function localizarUsuario(mostrarProximas = false) {
             if (marcadorUsuario) mapa.removeLayer(marcadorUsuario);
             if (circuloPrecisao) mapa.removeLayer(circuloPrecisao);
 
-            const iconeUsuario = L.divIcon({
-                className: '',
-                html: '<div style="width:12px;height:12px;background:#2563eb;border:2px solid #fff;border-radius:2px;box-shadow:0 1px 5px rgba(0,0,0,.45);"></div>',
-                iconSize: [16, 16],
-                iconAnchor: [8, 8]
-            });
-            marcadorUsuario = L.marker([lat, lng], {icon: iconeUsuario})
-                .addTo(mapa).bindPopup('Você está aqui');
+            marcadorUsuario = L.circleMarker([lat, lng], {
+                radius: 9, color: '#ffffff', weight: 3,
+                fillColor: '#2563eb', fillOpacity: 1
+            }).addTo(mapa).bindPopup('📍 Você está aqui');
 
             circuloPrecisao = L.circle([lat, lng], {
                 radius: posicao.coords.accuracy || 30,
@@ -372,10 +376,12 @@ busca.onAdd = function() {
     const div = L.DomUtil.create('div');
 
     div.innerHTML = `
-        <div id="controleBusca">
-            <input id="campoBusca" type="text" placeholder="Pesquisar endereço" autocomplete="off" aria-label="Pesquisar endereço">
-            <button id="btnBuscar" style="border:none;border-radius:5px;background:#111827;color:white;cursor:pointer;">Buscar</button>
-            <div id="sugestoesBusca" role="listbox"></div>
+        <div style="position:relative;background:white;padding:8px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;gap:5px;">
+            <div style="position:relative;">
+                <input id="campoBusca" type="text" autocomplete="off" placeholder="🔎 Pesquisar endereço" style="width:220px;box-sizing:border-box;padding:8px;border:1px solid #ccc;border-radius:5px;outline:none;">
+                <div id="sugestoesBusca" role="listbox" style="display:none;position:absolute;top:39px;left:0;width:300px;max-width:calc(100vw - 70px);max-height:240px;overflow-y:auto;background:white;border:1px solid #d1d5db;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.2);z-index:2000;"></div>
+            </div>
+            <button id="btnBuscar" style="padding:8px 12px;border:none;border-radius:5px;background:#111827;color:white;cursor:pointer;">Buscar</button>
         </div>
     `;
 
@@ -386,85 +392,99 @@ busca.onAdd = function() {
 
 busca.addTo(mapa);
 
+// Ordem visual: pesquisa, localizar/vagas próximas e zoom.
+mapa.zoomControl.setPosition('topleft');
+setTimeout(() => {
+    const canto = document.querySelector('.leaflet-top.leaflet-left');
+    const buscaEl = document.getElementById('campoBusca')?.closest('.leaflet-control');
+    const localEl = document.getElementById('controlesLocalizacao')?.closest('.leaflet-control');
+    const zoomEl = canto && canto.querySelector('.leaflet-control-zoom');
+    if (canto && buscaEl && localEl && zoomEl) {
+        canto.appendChild(buscaEl);
+        canto.appendChild(localEl);
+        canto.appendChild(zoomEl);
+    }
+}, 0);
+
 const campoBusca = document.getElementById('campoBusca');
 const sugestoesBusca = document.getElementById('sugestoesBusca');
 let temporizadorBusca = null;
-let marcadorPesquisa = null;
 let resultadosBusca = [];
-
-function esconderSugestoes() {
-    sugestoesBusca.style.display = 'none';
-    sugestoesBusca.innerHTML = '';
-}
+let marcadorBusca = null;
 
 function selecionarEndereco(resultado) {
-    const latitude = Number(resultado.lat);
-    const longitude = Number(resultado.lon);
+    const latitude = parseFloat(resultado.lat);
+    const longitude = parseFloat(resultado.lon);
     campoBusca.value = resultado.display_name;
-    esconderSugestoes();
+    sugestoesBusca.style.display = 'none';
     mapa.setView([latitude, longitude], 18);
-    if (marcadorPesquisa) mapa.removeLayer(marcadorPesquisa);
-    marcadorPesquisa = L.marker([latitude, longitude]).addTo(mapa)
+    if (marcadorBusca) mapa.removeLayer(marcadorBusca);
+    marcadorBusca = L.marker([latitude, longitude]).addTo(mapa)
         .bindPopup(resultado.display_name).openPopup();
 }
 
-async function buscarSugestoes() {
-    const termo = campoBusca.value.trim();
-    if (termo.length < 3) {
-        esconderSugestoes();
+async function buscarEnderecos(mostrarAlerta = false) {
+    const endereco = campoBusca.value.trim();
+    if (!endereco) {
+        sugestoesBusca.style.display = 'none';
+        if (mostrarAlerta) alert('Digite um endereço.');
         return;
     }
     try {
-        const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=5&countrycodes=br&q=' + encodeURIComponent(termo);
-        const resposta = await fetch(url, {headers: {'Accept-Language': 'pt-BR'}});
-        if (!resposta.ok) throw new Error('Falha ao pesquisar endereço');
+        const resposta = await fetch(
+            'https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=5&countrycodes=br&q=' + encodeURIComponent(endereco)
+        );
+        if (!resposta.ok) throw new Error('Falha na pesquisa');
         resultadosBusca = await resposta.json();
         sugestoesBusca.innerHTML = '';
         if (!resultadosBusca.length) {
-            sugestoesBusca.innerHTML = '<div style="padding:10px;font-size:12px">Nenhum endereço encontrado.</div>';
-        } else {
-            resultadosBusca.forEach(resultado => {
-                const botao = document.createElement('button');
-                botao.type = 'button';
-                botao.className = 'sugestao-endereco';
-                botao.textContent = resultado.display_name;
-                botao.setAttribute('role', 'option');
-                botao.addEventListener('click', () => selecionarEndereco(resultado));
-                sugestoesBusca.appendChild(botao);
-            });
+            sugestoesBusca.style.display = 'none';
+            if (mostrarAlerta) alert('Endereço não encontrado.');
+            return;
         }
+        resultadosBusca.forEach((resultado, indice) => {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.setAttribute('role', 'option');
+            item.textContent = resultado.display_name;
+            item.style.cssText = 'display:block;width:100%;padding:10px;text-align:left;border:0;border-bottom:1px solid #eee;background:white;color:#111827;cursor:pointer;font-size:12px;line-height:1.4;';
+            item.addEventListener('mouseenter', () => item.style.background = '#f3f4f6');
+            item.addEventListener('mouseleave', () => item.style.background = 'white');
+            item.addEventListener('click', () => selecionarEndereco(resultado));
+            sugestoesBusca.appendChild(item);
+        });
         sugestoesBusca.style.display = 'block';
+        if (mostrarAlerta && resultadosBusca.length === 1) selecionarEndereco(resultadosBusca[0]);
     } catch (erro) {
-        console.error('Erro ao sugerir endereços:', erro);
-        esconderSugestoes();
+        console.error('Erro na busca:', erro);
+        sugestoesBusca.style.display = 'none';
+        if (mostrarAlerta) alert('Não foi possível pesquisar o endereço. Verifique sua conexão e tente novamente.');
     }
 }
 
 campoBusca.addEventListener('input', () => {
     clearTimeout(temporizadorBusca);
-    temporizadorBusca = setTimeout(buscarSugestoes, 450);
+    if (campoBusca.value.trim().length < 3) {
+        sugestoesBusca.style.display = 'none';
+        return;
+    }
+    temporizadorBusca = setTimeout(() => buscarEnderecos(false), 600);
 });
 
 campoBusca.addEventListener('keydown', event => {
-    if (event.key === 'Escape') esconderSugestoes();
     if (event.key === 'Enter') {
         event.preventDefault();
-        if (resultadosBusca.length) selecionarEndereco(resultadosBusca[0]);
-        else buscarSugestoes();
+        buscarEnderecos(true);
+    } else if (event.key === 'Escape') {
+        sugestoesBusca.style.display = 'none';
     }
 });
 
-document.getElementById('btnBuscar').onclick = async function() {
-    if (resultadosBusca.length) {
-        selecionarEndereco(resultadosBusca[0]);
-        return;
-    }
-    await buscarSugestoes();
-    if (resultadosBusca.length) selecionarEndereco(resultadosBusca[0]);
-};
-
+document.getElementById('btnBuscar').onclick = () => buscarEnderecos(true);
 document.addEventListener('click', event => {
-    if (!event.target.closest('#controleBusca')) esconderSugestoes();
+    if (!event.target.closest('#campoBusca') && !event.target.closest('#sugestoesBusca')) {
+        sugestoesBusca.style.display = 'none';
+    }
 });
 
     // Mapa OpenStreetMap
@@ -536,8 +556,32 @@ const icone = L.divIcon({
 
             const resposta = await fetch('/vagas');
 
-            const vagas = await resposta.json();
+            const vagasRecebidas = await resposta.json();
+
+            // Exibe somente quatro vagas, alinhadas junto à guia da praça,
+            // no lado da Rua 15 de Novembro. Os pontos seguem a diagonal da rua.
+            const posicoesRua15 = [
+                { latitude: -23.08778, longitude: -47.21637 },
+                { latitude: -23.08793, longitude: -47.21646 },
+                { latitude: -23.08808, longitude: -47.21655 },
+                { latitude: -23.08823, longitude: -47.21664 }
+            ];
+
+            const vagas = vagasRecebidas
+                .slice()
+                .sort((a, b) => String(a.codigo).localeCompare(String(b.codigo), 'pt-BR', { numeric: true }))
+                .slice(0, 4)
+                .map((vaga, indice) => ({ ...vaga, ...posicoesRua15[indice] }));
+
             vagasCache = vagas;
+
+            // Remove marcadores de vagas que não fazem mais parte das quatro exibidas.
+            Object.keys(marcadores).forEach(codigo => {
+                if (!vagas.some(vaga => vaga.codigo === codigo)) {
+                    mapa.removeLayer(marcadores[codigo]);
+                    delete marcadores[codigo];
+                }
+            });
 
             let livres = 0;
 let ocupadas = 0;
