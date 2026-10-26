@@ -376,40 +376,12 @@ busca.onAdd = function() {
     const div = L.DomUtil.create('div');
 
     div.innerHTML = `
-        <div style="
-            background:white;
-            padding:8px;
-            border-radius:8px;
-            box-shadow:0 2px 8px rgba(0,0,0,0.3);
-            display:flex;
-            gap:5px;
-        ">
-            <input
-                id="campoBusca"
-                type="text"
-                placeholder="🔎 Pesquisar endereço"
-                style="
-                    width:220px;
-                    padding:8px;
-                    border:1px solid #ccc;
-                    border-radius:5px;
-                    outline:none;
-                "
-            >
-
-            <button
-                id="btnBuscar"
-                style="
-                    padding:8px 12px;
-                    border:none;
-                    border-radius:5px;
-                    background:#111827;
-                    color:white;
-                    cursor:pointer;
-                "
-            >
-                Buscar
-            </button>
+        <div style="position:relative;background:white;padding:8px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;gap:5px;">
+            <div style="position:relative;">
+                <input id="campoBusca" type="text" autocomplete="off" placeholder="🔎 Pesquisar endereço" style="width:220px;box-sizing:border-box;padding:8px;border:1px solid #ccc;border-radius:5px;outline:none;">
+                <div id="sugestoesBusca" role="listbox" style="display:none;position:absolute;top:39px;left:0;width:300px;max-width:calc(100vw - 70px);max-height:240px;overflow-y:auto;background:white;border:1px solid #d1d5db;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.2);z-index:2000;"></div>
+            </div>
+            <button id="btnBuscar" style="padding:8px 12px;border:none;border-radius:5px;background:#111827;color:white;cursor:pointer;">Buscar</button>
         </div>
     `;
 
@@ -434,50 +406,86 @@ setTimeout(() => {
     }
 }, 0);
 
-document.getElementById('btnBuscar').onclick = async function() {
+const campoBusca = document.getElementById('campoBusca');
+const sugestoesBusca = document.getElementById('sugestoesBusca');
+let temporizadorBusca = null;
+let resultadosBusca = [];
+let marcadorBusca = null;
 
-    const endereco = document.getElementById('campoBusca').value;
+function selecionarEndereco(resultado) {
+    const latitude = parseFloat(resultado.lat);
+    const longitude = parseFloat(resultado.lon);
+    campoBusca.value = resultado.display_name;
+    sugestoesBusca.style.display = 'none';
+    mapa.setView([latitude, longitude], 18);
+    if (marcadorBusca) mapa.removeLayer(marcadorBusca);
+    marcadorBusca = L.marker([latitude, longitude]).addTo(mapa)
+        .bindPopup(resultado.display_name).openPopup();
+}
 
+async function buscarEnderecos(mostrarAlerta = false) {
+    const endereco = campoBusca.value.trim();
     if (!endereco) {
-        alert('Digite um endereço.');
+        sugestoesBusca.style.display = 'none';
+        if (mostrarAlerta) alert('Digite um endereço.');
         return;
     }
-
     try {
-
         const resposta = await fetch(
-            'https://nominatim.openstreetmap.org/search?format=json&limit=1&q='
-            + encodeURIComponent(endereco)
+            'https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=5&countrycodes=br&q=' + encodeURIComponent(endereco)
         );
-
-        const resultados = await resposta.json();
-
-        if (resultados.length === 0) {
-            alert('Endereço não encontrado.');
+        if (!resposta.ok) throw new Error('Falha na pesquisa');
+        resultadosBusca = await resposta.json();
+        sugestoesBusca.innerHTML = '';
+        if (!resultadosBusca.length) {
+            sugestoesBusca.style.display = 'none';
+            if (mostrarAlerta) alert('Endereço não encontrado.');
             return;
         }
-
-        const latitude = parseFloat(resultados[0].lat);
-        const longitude = parseFloat(resultados[0].lon);
-
-        mapa.setView(
-            [latitude, longitude],
-            18
-        );
-
-        L.marker([latitude, longitude])
-            .addTo(mapa)
-            .bindPopup(endereco)
-            .openPopup();
-
+        resultadosBusca.forEach((resultado, indice) => {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.setAttribute('role', 'option');
+            item.textContent = resultado.display_name;
+            item.style.cssText = 'display:block;width:100%;padding:10px;text-align:left;border:0;border-bottom:1px solid #eee;background:white;color:#111827;cursor:pointer;font-size:12px;line-height:1.4;';
+            item.addEventListener('mouseenter', () => item.style.background = '#f3f4f6');
+            item.addEventListener('mouseleave', () => item.style.background = 'white');
+            item.addEventListener('click', () => selecionarEndereco(resultado));
+            sugestoesBusca.appendChild(item);
+        });
+        sugestoesBusca.style.display = 'block';
+        if (mostrarAlerta && resultadosBusca.length === 1) selecionarEndereco(resultadosBusca[0]);
     } catch (erro) {
-
         console.error('Erro na busca:', erro);
-
-        alert('Não foi possível pesquisar o endereço.');
-
+        sugestoesBusca.style.display = 'none';
+        if (mostrarAlerta) alert('Não foi possível pesquisar o endereço. Verifique sua conexão e tente novamente.');
     }
-};
+}
+
+campoBusca.addEventListener('input', () => {
+    clearTimeout(temporizadorBusca);
+    if (campoBusca.value.trim().length < 3) {
+        sugestoesBusca.style.display = 'none';
+        return;
+    }
+    temporizadorBusca = setTimeout(() => buscarEnderecos(false), 600);
+});
+
+campoBusca.addEventListener('keydown', event => {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        buscarEnderecos(true);
+    } else if (event.key === 'Escape') {
+        sugestoesBusca.style.display = 'none';
+    }
+});
+
+document.getElementById('btnBuscar').onclick = () => buscarEnderecos(true);
+document.addEventListener('click', event => {
+    if (!event.target.closest('#campoBusca') && !event.target.closest('#sugestoesBusca')) {
+        sugestoesBusca.style.display = 'none';
+    }
+});
 
     // Mapa OpenStreetMap
     L.tileLayer(
@@ -548,8 +556,32 @@ const icone = L.divIcon({
 
             const resposta = await fetch('/vagas');
 
-            const vagas = await resposta.json();
+            const vagasRecebidas = await resposta.json();
+
+            // Exibe somente quatro vagas, alinhadas na Rua 15 de Novembro.
+            // Coordenadas aproximadas da lateral sul da Praça Prudente de Moraes.
+            const posicoesRua15 = [
+                { latitude: -23.08818, longitude: -47.21675 },
+                { latitude: -23.08818, longitude: -47.21663 },
+                { latitude: -23.08818, longitude: -47.21651 },
+                { latitude: -23.08818, longitude: -47.21639 }
+            ];
+
+            const vagas = vagasRecebidas
+                .slice()
+                .sort((a, b) => String(a.codigo).localeCompare(String(b.codigo), 'pt-BR', { numeric: true }))
+                .slice(0, 4)
+                .map((vaga, indice) => ({ ...vaga, ...posicoesRua15[indice] }));
+
             vagasCache = vagas;
+
+            // Remove marcadores de vagas que não fazem mais parte das quatro exibidas.
+            Object.keys(marcadores).forEach(codigo => {
+                if (!vagas.some(vaga => vaga.codigo === codigo)) {
+                    mapa.removeLayer(marcadores[codigo]);
+                    delete marcadores[codigo];
+                }
+            });
 
             let livres = 0;
 let ocupadas = 0;
