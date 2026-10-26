@@ -83,7 +83,8 @@ header p {
             position: absolute;
             z-index: 1200;
             top: 175px;
-            right: 12px;
+            left: 12px;
+            right: auto;
             width: min(340px, calc(100vw - 48px));
             max-height: 55vh;
             overflow-y: auto;
@@ -95,7 +96,16 @@ header p {
             color: #111827;
             font-size: 13px;
         }
-        #painelProximas h3 { margin: 0 0 8px; font-size: 16px; }
+        #painelProximas h3 { margin: 0 32px 8px 0; font-size: 16px; }
+        #fecharProximas {
+            position: absolute; top: 6px; right: 6px;
+            width: 28px; height: 28px; padding: 0 !important;
+            font-size: 20px; line-height: 28px;
+            background: #e5e7eb !important; color: #111827 !important;
+        }
+        #controlesLocalizacao { display: flex; flex-direction: column; gap: 6px; }
+        #btnLocalizacao, #btnProximas { width: 100%; box-sizing: border-box; }
+        #btnProximas { margin-top: 0 !important; }
         #painelProximas .vaga-proxima {
             padding: 8px 0;
             border-top: 1px solid #e5e7eb;
@@ -109,7 +119,7 @@ header p {
             font-size: 13px; font-weight: bold;
         }
         @media (max-width: 600px) {
-            #painelProximas { top: 165px; right: 8px; }
+            #painelProximas { top: 165px; left: 8px; right: auto; }
         }
 
     </style>
@@ -134,10 +144,10 @@ header p {
 
 <div id="map"></div>
 <div id="painelProximas" role="region" aria-label="Vagas próximas">
+    <button type="button" id="fecharProximas" aria-label="Fechar painel">×</button>
     <h3>📍 Vagas próximas de mim</h3>
     <p id="estadoProximas">Toque em “Encontrar vagas próximas” para usar sua localização.</p>
     <div id="listaProximas"></div>
-    <button type="button" id="fecharProximas">Fechar</button>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -151,10 +161,11 @@ header p {
 );
 
 // Botão de localização
-const botaoLocalizacao = L.control({ position: 'topright' });
+const botaoLocalizacao = L.control({ position: 'topleft' });
 
 botaoLocalizacao.onAdd = function() {
     const div = L.DomUtil.create('div');
+    div.id = "controlesLocalizacao";
 
     div.innerHTML = `
         <button id="btnLocalizacao" style="
@@ -243,12 +254,17 @@ function exibirVagasProximas() {
         linha.innerHTML = `
             <div><strong>${vaga.codigo}</strong> — ${status}</div>
             <div>Distância em linha reta: ${formatarDistancia(vaga.distancia)}</div>
-            <button type="button">Ver no mapa</button>
+            <button type="button">Traçar rota</button>
         `;
         linha.querySelector('button').onclick = () => {
-            mapa.setView([vaga.latitude, vaga.longitude], 19);
-            const marcador = marcadores[vaga.codigo];
-            if (marcador) marcador.openPopup();
+            if (!ultimaLocalizacaoUsuario) {
+                localizarUsuario(true);
+                return;
+            }
+            const origem = `${ultimaLocalizacaoUsuario.lat},${ultimaLocalizacaoUsuario.lng}`;
+            const destino = `${vaga.latitude},${vaga.longitude}`;
+            const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origem)}&destination=${encodeURIComponent(destino)}&travelmode=driving`;
+            window.open(url, '_blank', 'noopener,noreferrer');
         };
         lista.appendChild(linha);
     });
@@ -359,6 +375,20 @@ busca.onAdd = function() {
 };
 
 busca.addTo(mapa);
+
+// Ordem visual: pesquisa, localizar/vagas próximas e zoom.
+mapa.zoomControl.setPosition('topleft');
+setTimeout(() => {
+    const canto = document.querySelector('.leaflet-top.leaflet-left');
+    const buscaEl = document.getElementById('campoBusca')?.closest('.leaflet-control');
+    const localEl = document.getElementById('controlesLocalizacao')?.closest('.leaflet-control');
+    const zoomEl = canto && canto.querySelector('.leaflet-control-zoom');
+    if (canto && buscaEl && localEl && zoomEl) {
+        canto.appendChild(buscaEl);
+        canto.appendChild(localEl);
+        canto.appendChild(zoomEl);
+    }
+}, 0);
 
 document.getElementById('btnBuscar').onclick = async function() {
 
