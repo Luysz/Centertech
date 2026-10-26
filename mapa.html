@@ -201,6 +201,7 @@ let marcadorUsuario = null;
 let circuloPrecisao = null;
 let ultimaLocalizacaoUsuario = null;
 let vagasCache = [];
+let camadaRota = null;
 
 function distanciaMetros(lat1, lon1, lat2, lon2) {
     const R = 6371000;
@@ -256,15 +257,58 @@ function exibirVagasProximas() {
             <div>Distância em linha reta: ${formatarDistancia(vaga.distancia)}</div>
             <button type="button">Traçar rota</button>
         `;
-        linha.querySelector('button').onclick = () => {
+        linha.querySelector('button').textContent = 'Traçar rota no mapa';
+        linha.querySelector('button').onclick = async () => {
             if (!ultimaLocalizacaoUsuario) {
                 localizarUsuario(true);
                 return;
             }
-            const origem = `${ultimaLocalizacaoUsuario.lat},${ultimaLocalizacaoUsuario.lng}`;
-            const destino = `${vaga.latitude},${vaga.longitude}`;
-            const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origem)}&destination=${encodeURIComponent(destino)}&travelmode=driving`;
-            window.open(url, '_blank', 'noopener,noreferrer');
+
+            const botaoRota = linha.querySelector('button');
+            botaoRota.disabled = true;
+            botaoRota.textContent = 'Calculando rota…';
+            estado.textContent = `Calculando o trajeto até ${vaga.codigo}…`;
+
+            try {
+                // OSRM recebe coordenadas na ordem longitude,latitude.
+                const origem = `${ultimaLocalizacaoUsuario.lng},${ultimaLocalizacaoUsuario.lat}`;
+                const destino = `${vaga.longitude},${vaga.latitude}`;
+                const url = `https://router.project-osrm.org/route/v1/driving/${origem};${destino}?overview=full&geometries=geojson&steps=true`;
+                const resposta = await fetch(url);
+
+                if (!resposta.ok) throw new Error('O serviço de rotas não respondeu.');
+                const dados = await resposta.json();
+
+                if (dados.code !== 'Ok' || !dados.routes || !dados.routes.length) {
+                    throw new Error('Não foi possível encontrar uma rota viária para esta vaga.');
+                }
+
+                if (camadaRota) mapa.removeLayer(camadaRota);
+
+                const rota = dados.routes[0];
+                const coordenadas = rota.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+                camadaRota = L.polyline(coordenadas, {
+                    color: '#2563eb',
+                    weight: 6,
+                    opacity: 0.9,
+                    lineJoin: 'round'
+                }).addTo(mapa);
+
+                mapa.fitBounds(camadaRota.getBounds(), {padding: [45, 45]});
+                L.popup()
+                    .setLatLng([vaga.latitude, vaga.longitude])
+                    .setContent(`<strong>${vaga.codigo}</strong><br>Trajeto: ${formatarDistancia(rota.distance)}<br>Tempo estimado: ${Math.max(1, Math.round(rota.duration / 60))} min`)
+                    .openOn(mapa);
+
+                estado.textContent = `Rota até ${vaga.codigo}: ${formatarDistancia(rota.distance)} · aproximadamente ${Math.max(1, Math.round(rota.duration / 60))} min.`;
+                botaoRota.textContent = 'Atualizar rota';
+            } catch (erro) {
+                console.error('Erro ao calcular rota:', erro);
+                estado.textContent = erro.message || 'Não foi possível calcular a rota. Tente novamente.';
+                botaoRota.textContent = 'Tentar novamente';
+            } finally {
+                botaoRota.disabled = false;
+            }
         };
         lista.appendChild(linha);
     });
