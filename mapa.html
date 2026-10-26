@@ -79,6 +79,15 @@ header p {
 }
 
     
+        .leaflet-top.leaflet-left .leaflet-control:has(#controleBusca) {
+            position: relative;
+            z-index: 2500 !important;
+        }
+        #controleBusca, #sugestoesBusca { isolation: isolate; }
+        @media (max-width: 600px) {
+            #controleBusca { width: min(280px, calc(100vw - 58px)); }
+        }
+
         #painelProximas {
             position: absolute;
             z-index: 1200;
@@ -376,12 +385,12 @@ busca.onAdd = function() {
     const div = L.DomUtil.create('div');
 
     div.innerHTML = `
-        <div style="position:relative;background:white;padding:8px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;gap:5px;">
-            <div style="position:relative;">
-                <input id="campoBusca" type="text" autocomplete="off" placeholder="🔎 Pesquisar endereço" style="width:220px;box-sizing:border-box;padding:8px;border:1px solid #ccc;border-radius:5px;outline:none;">
-                <div id="sugestoesBusca" role="listbox" style="display:none;position:absolute;top:39px;left:0;width:300px;max-width:calc(100vw - 70px);max-height:240px;overflow-y:auto;background:white;border:1px solid #d1d5db;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.2);z-index:2000;"></div>
+        <div id="controleBusca" style="position:relative;z-index:2500;width:min(280px,calc(100vw - 58px));max-width:calc(100vw - 58px);box-sizing:border-box;background:white;padding:8px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:flex-start;gap:5px;">
+            <div style="position:relative;flex:1 1 auto;min-width:0;">
+                <input id="campoBusca" type="text" autocomplete="off" placeholder="🔎 Pesquisar endereço" style="display:block;width:100%;min-width:0;box-sizing:border-box;padding:8px;border:1px solid #ccc;border-radius:5px;outline:none;">
+                <div id="sugestoesBusca" role="listbox" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;width:auto;max-width:calc(100vw - 58px);max-height:220px;overflow-y:auto;background:white;border:1px solid #d1d5db;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.25);z-index:3000;"></div>
             </div>
-            <button id="btnBuscar" style="padding:8px 12px;border:none;border-radius:5px;background:#111827;color:white;cursor:pointer;">Buscar</button>
+            <button id="btnBuscar" style="flex:0 0 auto;padding:8px 10px;border:none;border-radius:5px;background:#111827;color:white;cursor:pointer;">Buscar</button>
         </div>
     `;
 
