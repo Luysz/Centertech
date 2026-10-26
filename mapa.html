@@ -558,13 +558,13 @@ const icone = L.divIcon({
 
             const vagasRecebidas = await resposta.json();
 
-            // Exibe somente quatro vagas, alinhadas na Rua 15 de Novembro.
-            // Coordenadas aproximadas da lateral sul da Praça Prudente de Moraes.
+            // Exibe somente quatro vagas, alinhadas junto à guia da praça,
+            // no lado da Rua 15 de Novembro. Os pontos seguem a diagonal da rua.
             const posicoesRua15 = [
-                { latitude: -23.08818, longitude: -47.21675 },
-                { latitude: -23.08818, longitude: -47.21663 },
-                { latitude: -23.08818, longitude: -47.21651 },
-                { latitude: -23.08818, longitude: -47.21639 }
+                { latitude: -23.08778, longitude: -47.21637 },
+                { latitude: -23.08793, longitude: -47.21646 },
+                { latitude: -23.08808, longitude: -47.21655 },
+                { latitude: -23.08823, longitude: -47.21664 }
             ];
 
             const vagas = vagasRecebidas
