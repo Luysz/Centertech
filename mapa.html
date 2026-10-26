@@ -112,8 +112,8 @@ header p {
             font-size: 20px; line-height: 28px;
             background: #e5e7eb !important; color: #111827 !important;
         }
-        #controlesLocalizacao { display: flex; flex-direction: column; gap: 6px; }
-        #btnLocalizacao, #btnProximas { width: 100%; box-sizing: border-box; }
+        #controlesLocalizacao { display: flex; flex-direction: row; align-items: center; gap: 6px; }
+        #btnLocalizacao { width: 34px; height: 34px; min-width: 34px; box-sizing: border-box; padding: 0 !important; display: inline-flex; align-items: center; justify-content: center; font-size: 16px !important; flex: 0 0 34px; }\n        #btnProximas { width: auto; box-sizing: border-box; white-space: nowrap; }
         #btnProximas { margin-top: 0 !important; }
         #painelProximas .vaga-proxima {
             padding: 8px 0;
@@ -177,12 +177,15 @@ botaoLocalizacao.onAdd = function() {
     div.id = "controlesLocalizacao";
 
     div.innerHTML = `
-        <button id="btnLocalizacao" style="
+        <button id="btnLocalizacao" type="button" title="Minha localização" aria-label="Minha localização" style="
             background:white;
             border:none;
-            border-radius:8px;
-            padding:10px 12px;
-            font-size:20px;
+            border-radius:6px;
+            padding:0;
+            width:34px;
+            height:34px;
+            font-size:16px;
+            line-height:1;
             cursor:pointer;
             box-shadow:0 2px 8px rgba(0,0,0,0.3);
         ">
