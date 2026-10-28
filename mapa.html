@@ -570,13 +570,13 @@ const icone = L.divIcon({
 
             const vagasRecebidas = await resposta.json();
 
-            // Exibe somente quatro vagas, alinhadas junto à guia da praça,
-            // no lado da Rua 15 de Novembro. Os pontos seguem a diagonal da rua.
+            // Quatro vagas deslocadas para o lado da rua,
+            // mantendo a diagonal e o espaçamento entre elas.
             const posicoesRua15 = [
-                { latitude: -23.08778, longitude: -47.21637 },
-                { latitude: -23.08793, longitude: -47.21646 },
-                { latitude: -23.08808, longitude: -47.21655 },
-                { latitude: -23.08823, longitude: -47.21664 }
+                { latitude: -23.08778, longitude: -47.21647 },
+                { latitude: -23.08793, longitude: -47.21656 },
+                { latitude: -23.08808, longitude: -47.21665 },
+                { latitude: -23.08823, longitude: -47.21674 }
             ];
 
             const vagas = vagasRecebidas
