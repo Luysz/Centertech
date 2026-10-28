@@ -732,11 +732,18 @@ marcador.on('popupopen', async function() {
 
         registrosVaga.slice(0, 3).forEach(registro => {
 
-            const data =
-                new Date(registro.data_hora);
+            const dataRecebida = registro.data_hora;
 
-            const dataFormatada =
-                data.toLocaleString('pt-BR');
+            const temFusoHorario =
+                /Z$|[+-]\d{2}:\d{2}$/.test(dataRecebida);
+
+            const data = new Date(
+                temFusoHorario ? dataRecebida : dataRecebida + 'Z'
+            );
+
+            const dataFormatada = data.toLocaleString('pt-BR', {
+                timeZone: 'America/Sao_Paulo'
+            });
 
             const statusTexto =
                 registro.status === 'livre'
