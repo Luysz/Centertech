@@ -271,10 +271,14 @@ function exibirVagasProximas() {
         `;
         linha.querySelector('button').textContent = 'Traçar rota no mapa';
         linha.querySelector('button').onclick = async () => {
-            if (!ultimaLocalizacaoUsuario) {
-                localizarUsuario(true);
-                return;
-            }
+
+        // Fecha o painel de vagas próximas
+        document.getElementById('painelProximas').style.display = 'none';
+
+         if (!ultimaLocalizacaoUsuario) {
+            localizarUsuario(true);
+            return;
+        }
 
             const botaoRota = linha.querySelector('button');
             botaoRota.disabled = true;
