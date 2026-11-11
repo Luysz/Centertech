@@ -508,12 +508,11 @@ document.addEventListener('click', event => {
 });
 
     // Mapa OpenStreetMap
-    L.tileLayer(
-        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        {
-            attribution: '&copy; OpenStreetMap contributors'
-        }
-    ).addTo(mapa);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 22,
+    maxNativeZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(mapa);
 
 
     // Guarda os marcadores das vagas
