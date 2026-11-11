@@ -164,7 +164,11 @@ header p {
 <script>
 
     // Centro inicial do mapa
-    const mapa = L.map('map').setView(
+    const mapa = L.map('map', {
+    maxZoom: 22,
+    zoomSnap: 0.5,
+    zoomDelta: 0.5
+}).setView(
     [-23.0880, -47.2164],
     18
 );
@@ -811,7 +815,7 @@ linha.style.fontSize = '12px';
     atualizarVagas();
 
     // Atualiza a cada 5 segundos
-    setInterval(atualizarVagas, 3000);
+    setInterval(atualizarVagas, 2000);
 
 </script>
 
