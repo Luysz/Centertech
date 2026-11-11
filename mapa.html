@@ -317,7 +317,31 @@ function exibirVagasProximas() {
                 mapa.fitBounds(camadaRota.getBounds(), {padding: [45, 45]});
                 L.popup()
                     .setLatLng([vaga.latitude, vaga.longitude])
-                    .setContent(`<strong>${vaga.codigo}</strong><br>Trajeto: ${formatarDistancia(rota.distance)}<br>Tempo estimado: ${Math.max(1, Math.round(rota.duration / 60))} min`)
+                    .setContent(`
+    <div style="min-width:180px;">
+        <strong>${vaga.codigo}</strong><br>
+        Trajeto: ${formatarDistancia(rota.distance)}<br>
+        Tempo estimado: ${Math.max(1, Math.round(rota.duration / 60))} min
+
+        <a
+            href="https://www.google.com/maps/dir/?api=1&destination=${vaga.latitude},${vaga.longitude}&travelmode=driving&dir_action=navigate"
+            target="_blank"
+            rel="noopener noreferrer"
+            style="
+                display:block;
+                margin-top:10px;
+                padding:10px;
+                background:#2563eb;
+                color:white;
+                text-align:center;
+                text-decoration:none;
+                border-radius:7px;
+                font-weight:bold;
+            ">
+            Iniciar navegação
+        </a>
+    </div>
+`)
                     .openOn(mapa);
 
                 estado.textContent = `Rota até ${vaga.codigo}: ${formatarDistancia(rota.distance)} · aproximadamente ${Math.max(1, Math.round(rota.duration / 60))} min.`;
